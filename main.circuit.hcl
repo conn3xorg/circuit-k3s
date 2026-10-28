@@ -15,13 +15,13 @@ data "conn3x_host" "facts" {
 
 locals {
   # The first server by name starts the cluster. The others join it.
-  first      = sort(keys(var.servers))[0]
+  first      = coalesce(var.first_server, sort(keys(var.servers))[0])
   server_url = coalesce(var.server_url, "https://${try(var.servers[local.first].address, var.servers[local.first])}:6443")
   # Pod traffic to services needs br_netfilter. Rocky Linux 10 and other
   # EL10 images ship it in kernel-modules-extra, which they don't install.
   # A container can't load modules, so a module its host loaded counts.
   br_netfilter = {
-    command = "dnf -y install \"kernel-modules-extra-$(uname -r)\""
+    command = "command -v dnf >/dev/null || { echo 'br_netfilter is missing and this host has no dnf to install kernel-modules-extra' >&2; exit 1; }; dnf -y install \"kernel-modules-extra-$(uname -r)\""
     unless  = "test -d /sys/module/br_netfilter || modprobe -n br_netfilter"
   }
 

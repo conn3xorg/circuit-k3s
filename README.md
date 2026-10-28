@@ -29,7 +29,7 @@ Pass the token at run time, with `-var k3s_token=...` or `TF_VAR_k3s_token`, and
 
 Then run `conn3x init` and `conn3x apply`. A second `conn3x plan` says `No changes.`
 
-For a highly available control plane, give three servers. The first by name starts the cluster with embedded etcd and the others join it:
+For a highly available control plane, give three servers. The first by name starts the cluster with embedded etcd and the others join it. To add a server later whose name sorts first, set `first_server` to the one that started the cluster, or the new server would start a cluster of its own:
 
 ```hcl
 module "k3s" {
@@ -128,6 +128,7 @@ Set `k3s_version` and `checksums` together. Take the checksums for `k3s` and `k3
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | `servers` | any | Required | Server nodes, by name. Each value is an address, such as `"203.0.113.10"`, or a host object such as `{ address = "203.0.113.10", host_key = "ssh-ed25519 AAAA..." }`. A host object can also set `user`, `port`, `private_key_file` and `jump_hosts`. The first name in sorted order starts the cluster. |
+| `first_server` | string | `null` | Server that starts the cluster. When null, the first name in sorted order. Keep it the same for the life of the cluster. |
 | `agents` | any | `{}` | Agent nodes, by name, in the same form. A name can't be both a server and an agent. |
 | `token` | string, ephemeral | Required | Shared secret nodes join with. Keep it the same for the life of the cluster. |
 | `raspberry_pi` | bool | `false` | Turn on the memory cgroup in `/boot/firmware/cmdline.txt` and reboot once, for Raspberry Pi OS. |

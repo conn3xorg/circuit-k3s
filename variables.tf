@@ -8,6 +8,17 @@ variable "servers" {
   }
 }
 
+variable "first_server" {
+  type        = string
+  default     = null
+  description = "Server that starts the cluster. When null, the first name in sorted order. Keep it the same for the life of the cluster: adding a server whose name sorts first would otherwise start a new cluster on it."
+
+  validation {
+    condition     = var.first_server == null || contains(keys(var.servers), coalesce(var.first_server, "-"))
+    error_message = "first_server must be one of the names in servers."
+  }
+}
+
 variable "agents" {
   type        = any
   default     = {}
