@@ -280,11 +280,14 @@ circuit "k3s_agents" {
     become           = var.ssh_become
   }
 
+  # Agents join once every server is up. While a server joins embedded
+  # etcd, or restarts, a two-server cluster has no quorum, and an agent
+  # starting then can outlast its start timeout.
   step "curl" {
     package {
       name = "curl"
     }
-    depends_on = [conn3x_wait_for.k3s_first__api]
+    depends_on = [conn3x_wait_for.k3s_first__api, conn3x_service_action.k3s_servers__restart]
   }
 
   step "br_netfilter" {
