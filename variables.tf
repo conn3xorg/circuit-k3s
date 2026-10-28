@@ -71,6 +71,12 @@ variable "checksums" {
   }
 }
 
+variable "raspberry_pi" {
+  type        = bool
+  default     = false
+  description = "Turn on the memory cgroup in /boot/firmware/cmdline.txt and reboot once, which Raspberry Pi OS needs before k3s can run. Every host in the cluster must be a Raspberry Pi."
+}
+
 variable "server_url" {
   type        = string
   default     = null

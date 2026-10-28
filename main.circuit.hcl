@@ -25,6 +25,12 @@ locals {
     unless  = "test -d /sys/module/br_netfilter || modprobe -n br_netfilter"
   }
 
+  pi = var.raspberry_pi ? toset(["cmdline"]) : toset([])
+  pi_cgroups = {
+    command = "sed -i '1 s/$/ cgroup_memory=1 cgroup_enable=memory/' /boot/firmware/cmdline.txt"
+    unless  = "grep -qw cgroup_enable=memory /boot/firmware/cmdline.txt"
+  }
+
   binary = { x86_64 = "k3s", aarch64 = "k3s-arm64" }
   url    = { for name, f in data.conn3x_host.facts : name => "https://github.com/k3s-io/k3s/releases/download/${urlencode(var.k3s_version)}/${local.binary[f.arch]}" }
   sha256 = { for name, f in data.conn3x_host.facts : name => var.checksums[local.binary[f.arch]] }
@@ -87,6 +93,22 @@ circuit "k3s_first" {
     command {
       command = local.br_netfilter.command
       unless  = local.br_netfilter.unless
+    }
+  }
+
+  # Raspberry Pi OS boots with the memory cgroup off, and k3s needs it.
+  step "pi_cgroups" {
+    for_each = local.pi
+    command {
+      command = local.pi_cgroups.command
+      unless  = local.pi_cgroups.unless
+    }
+  }
+
+  step "pi_reboot" {
+    for_each = local.pi
+    reboot {
+      triggers = { cmdline = local.pi_cgroups.command }
     }
   }
 
@@ -176,6 +198,22 @@ circuit "k3s_servers" {
     }
   }
 
+  # Raspberry Pi OS boots with the memory cgroup off, and k3s needs it.
+  step "pi_cgroups" {
+    for_each = local.pi
+    command {
+      command = local.pi_cgroups.command
+      unless  = local.pi_cgroups.unless
+    }
+  }
+
+  step "pi_reboot" {
+    for_each = local.pi
+    reboot {
+      triggers = { cmdline = local.pi_cgroups.command }
+    }
+  }
+
   step "binary" {
     download {
       url    = local.url[each.key]
@@ -253,6 +291,22 @@ circuit "k3s_agents" {
     command {
       command = local.br_netfilter.command
       unless  = local.br_netfilter.unless
+    }
+  }
+
+  # Raspberry Pi OS boots with the memory cgroup off, and k3s needs it.
+  step "pi_cgroups" {
+    for_each = local.pi
+    command {
+      command = local.pi_cgroups.command
+      unless  = local.pi_cgroups.unless
+    }
+  }
+
+  step "pi_reboot" {
+    for_each = local.pi
+    reboot {
+      triggers = { cmdline = local.pi_cgroups.command }
     }
   }
 

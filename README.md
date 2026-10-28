@@ -58,6 +58,21 @@ servers = {
 
 To try it on a throwaway container first, see [examples/local](examples/local).
 
+### Raspberry Pi
+
+Raspberry Pi OS boots with the memory cgroup turned off, and k3s won't start without it. Set `raspberry_pi = true` and the circuit adds `cgroup_memory=1 cgroup_enable=memory` to `/boot/firmware/cmdline.txt`, then reboots each host once, before installing k3s. Every host in the cluster must be a Pi, since the reboot happens on all of them. The arm64 build of k3s is picked for you.
+
+```hcl
+module "k3s" {
+  source = "github.com/conn3xorg/circuit-k3s?ref=v0.1.0"
+
+  servers      = { pi1 = "192.168.1.31" }
+  agents       = { pi2 = "192.168.1.32", pi3 = "192.168.1.33" }
+  token        = var.k3s_token
+  raspberry_pi = true
+}
+```
+
 ### Getting a kubeconfig
 
 k3s writes one for the cluster admin to `/etc/rancher/k3s/k3s.yaml` on each server, pointing at `127.0.0.1`. Copy it and swap in the server's address:
@@ -89,13 +104,14 @@ A change to either restarts k3s on the hosts it affects, after the circuit's oth
 The first server by name runs first. On it, in order:
 
 1. Installs `curl` if it's missing.
-2. Makes sure the kernel has `br_netfilter`, which pod traffic to services needs. Rocky Linux 10 and other EL10 images ship it in `kernel-modules-extra`, which they don't install, so on those hosts the circuit installs `kernel-modules-extra` for the running kernel with `dnf`.
-3. Downloads the k3s binary for the host's architecture to `/usr/local/bin/k3s`. If the checksum doesn't match `checksums`, the apply fails and the old binary stays.
-4. Writes the token to `/etc/rancher/k3s/token`, mode `0600`.
-5. Writes `/etc/rancher/k3s/config.yaml`: the token file, every server's address as a `tls-san`, `cluster-init` when there's more than one server, and `server_config`.
-6. Writes `/etc/systemd/system/k3s.service`, the unit k3s's install script writes, with a five-minute start timeout so a node that can't start fails the apply instead of hanging it.
-7. Starts k3s now and at boot.
-8. Waits for the Kubernetes API to listen on port 6443.
+2. With `raspberry_pi`, turns on the memory cgroup and reboots once.
+3. Makes sure the kernel has `br_netfilter`, which pod traffic to services needs. Rocky Linux 10 and other EL10 images ship it in `kernel-modules-extra`, which they don't install, so on those hosts the circuit installs `kernel-modules-extra` for the running kernel with `dnf`.
+4. Downloads the k3s binary for the host's architecture to `/usr/local/bin/k3s`. If the checksum doesn't match `checksums`, the apply fails and the old binary stays.
+5. Writes the token to `/etc/rancher/k3s/token`, mode `0600`.
+6. Writes `/etc/rancher/k3s/config.yaml`: the token file, every server's address as a `tls-san`, `cluster-init` when there's more than one server, and `server_config`.
+7. Writes `/etc/systemd/system/k3s.service`, the unit k3s's install script writes, with a five-minute start timeout so a node that can't start fails the apply instead of hanging it.
+8. Starts k3s now and at boot.
+9. Waits for the Kubernetes API to listen on port 6443.
 
 Once the API is up, the other servers do the same with `server` set to `server_url`, and the agents do the same with `k3s-agent.service` and the agent settings. A change to the binary, the token, the settings or the unit restarts k3s.
 
@@ -114,6 +130,7 @@ Set `k3s_version` and `checksums` together. Take the checksums for `k3s` and `k3
 | `servers` | any | Required | Server nodes, by name. Each value is an address, such as `"203.0.113.10"`, or a host object such as `{ address = "203.0.113.10", host_key = "ssh-ed25519 AAAA..." }`. A host object can also set `user`, `port`, `private_key_file` and `jump_hosts`. The first name in sorted order starts the cluster. |
 | `agents` | any | `{}` | Agent nodes, by name, in the same form. A name can't be both a server and an agent. |
 | `token` | string, ephemeral | Required | Shared secret nodes join with. Keep it the same for the life of the cluster. |
+| `raspberry_pi` | bool | `false` | Turn on the memory cgroup in `/boot/firmware/cmdline.txt` and reboot once, for Raspberry Pi OS. |
 | `server_url` | string | `null` | URL the other nodes join through. When null, `https://FIRST_SERVER_ADDRESS:6443`. Set it when the nodes reach the first server on a private address, or through a load balancer. |
 | `server_config` | any | `{}` | More k3s server settings for `config.yaml`. |
 | `agent_config` | any | `{}` | More k3s agent settings for `config.yaml`. |
@@ -137,7 +154,7 @@ Requires Conn3x v0.6.4 or later, systemd on each host, and outbound HTTPS to git
 
 ## Tested on
 
-Rocky Linux 10, Fedora 45, Ubuntu 24.04 and Debian 13. CI applies [examples/local](examples/local) to each on amd64, checks that the second plan has no changes and that the node is Ready, and builds a cluster of two servers and an agent from [test/cluster](test/cluster). A server on a Rocky Linux 10 droplet with SELinux enforcing and an agent on Ubuntu 24.04 were also checked by hand.
+Rocky Linux 10, Fedora 45, Ubuntu 24.04 and Debian 13. CI applies [examples/local](examples/local) to each on amd64, checks that the second plan has no changes and that the node is Ready, and builds a cluster of two servers and an agent from [test/cluster](test/cluster). A server on a Rocky Linux 10 droplet with SELinux enforcing and an agent on Ubuntu 24.04 were also checked by hand. So was `raspberry_pi`, on a Debian 13 droplet with a stand-in `cmdline.txt`, which checks the edit and the reboot but not a Pi's kernel.
 
 ## License
 
