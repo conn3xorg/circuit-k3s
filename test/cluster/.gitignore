@@ -1,0 +1,5 @@
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate*
+id_ed25519*
+known_hosts
