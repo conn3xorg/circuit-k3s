@@ -8,7 +8,7 @@ It replaces the usual hand-off where Terraform makes the VMs and an Ansible play
 
 ```hcl
 module "k3s" {
-  source = "github.com/conn3xorg/circuit-k3s?ref=v0.1.0"
+  source = "github.com/conn3xorg/circuit-k3s?ref=v0.1.2"
 
   servers = { cp1 = "203.0.113.10" }
   agents = {
@@ -33,7 +33,7 @@ For a highly available control plane, give three servers. The first by name star
 
 ```hcl
 module "k3s" {
-  source = "github.com/conn3xorg/circuit-k3s?ref=v0.1.0"
+  source = "github.com/conn3xorg/circuit-k3s?ref=v0.1.2"
 
   servers = {
     cp1 = "10.0.0.10"
@@ -64,7 +64,7 @@ Raspberry Pi OS boots with the memory cgroup turned off, and k3s won't start wit
 
 ```hcl
 module "k3s" {
-  source = "github.com/conn3xorg/circuit-k3s?ref=v0.1.0"
+  source = "github.com/conn3xorg/circuit-k3s?ref=v0.1.2"
 
   servers      = { pi1 = "192.168.1.31" }
   agents       = { pi2 = "192.168.1.32", pi3 = "192.168.1.33" }
