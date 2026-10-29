@@ -166,9 +166,11 @@ circuit "k3s_first" {
     }
   }
 
+  # One server at a time: two etcd members down at once loses quorum.
   handler "restart" {
     service {
-      name = "k3s"
+      name   = "k3s"
+      serial = true
     }
   }
 }
@@ -188,7 +190,7 @@ circuit "k3s_servers" {
     package {
       name = "curl"
     }
-    depends_on = [conn3x_wait_for.k3s_first__api]
+    depends_on = [conn3x_wait_for.k3s_first__api, conn3x_service_action.k3s_first__restart]
   }
 
   step "br_netfilter" {
@@ -262,9 +264,11 @@ circuit "k3s_servers" {
     }
   }
 
+  # One server at a time: two etcd members down at once loses quorum.
   handler "restart" {
     service {
-      name = "k3s"
+      name   = "k3s"
+      serial = true
     }
   }
 }

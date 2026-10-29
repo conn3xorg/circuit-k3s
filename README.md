@@ -8,7 +8,7 @@ It replaces the usual hand-off where Terraform makes the VMs and an Ansible play
 
 ```hcl
 module "k3s" {
-  source = "github.com/conn3xorg/circuit-k3s?ref=v0.1.0"
+  source = "github.com/conn3xorg/circuit-k3s?ref=v0.1.3"
 
   servers = { cp1 = "203.0.113.10" }
   agents = {
@@ -33,7 +33,7 @@ For a highly available control plane, give three servers. The first by name star
 
 ```hcl
 module "k3s" {
-  source = "github.com/conn3xorg/circuit-k3s?ref=v0.1.0"
+  source = "github.com/conn3xorg/circuit-k3s?ref=v0.1.3"
 
   servers = {
     cp1 = "10.0.0.10"
@@ -64,7 +64,7 @@ Raspberry Pi OS boots with the memory cgroup turned off, and k3s won't start wit
 
 ```hcl
 module "k3s" {
-  source = "github.com/conn3xorg/circuit-k3s?ref=v0.1.0"
+  source = "github.com/conn3xorg/circuit-k3s?ref=v0.1.3"
 
   servers      = { pi1 = "192.168.1.31" }
   agents       = { pi2 = "192.168.1.32", pi3 = "192.168.1.33" }
@@ -113,7 +113,7 @@ The first server by name runs first. On it, in order:
 8. Starts k3s now and at boot.
 9. Waits for the Kubernetes API to listen on port 6443.
 
-Once the API is up, the other servers do the same with `server` set to `server_url`, and the agents do the same with `k3s-agent.service` and the agent settings. A change to the binary, the token, the settings or the unit restarts k3s.
+Once the API is up, the other servers do the same with `server` set to `server_url`, and the agents do the same with `k3s-agent.service` and the agent settings. A change to the binary, the token, the settings or the unit restarts k3s. Servers restart one at a time, each waiting until the last is back, so a cluster of three never has two etcd members down at once.
 
 Before the circuit runs, the `conn3x_host` data source reads each host's architecture over SSH. `x86_64` and `aarch64` are supported; others fail the plan.
 
@@ -121,7 +121,7 @@ The circuit doesn't open firewall ports. Between nodes, k3s needs TCP 6443 to th
 
 ### Upgrading
 
-Set `k3s_version` and `checksums` together. Take the checksums for `k3s` and `k3s-arm64` from the release's `sha256sum-amd64.txt` and `sha256sum-arm64.txt`. Conn3x replaces the binary and restarts k3s on each host. k3s supports moving up one minor version at a time.
+Set `k3s_version` and `checksums` together. Take the checksums for `k3s` and `k3s-arm64` from the release's `sha256sum-amd64.txt` and `sha256sum-arm64.txt`. Conn3x replaces the binary and restarts k3s on each host, the servers one at a time. k3s supports moving up one minor version at a time.
 
 ## Inputs
 
@@ -151,11 +151,13 @@ Set `k3s_version` and `checksums` together. Take the checksums for `k3s` and `k3
 
 ## Requirements
 
-Requires Conn3x v0.6.4 or later, systemd on each host, and outbound HTTPS to github.com. k3s itself needs 2 GB of memory on a server and 512 MB on an agent.
+Requires Conn3x v0.6.9 or later, systemd on each host, and outbound HTTPS to github.com. k3s itself needs 2 GB of memory on a server and 512 MB on an agent.
 
 ## Tested on
 
-Rocky Linux 10, Fedora 45, Ubuntu 24.04 and Debian 13. CI applies [examples/local](examples/local) to each on amd64, checks that the second plan has no changes and that the node is Ready, and builds a cluster of two servers and an agent from [test/cluster](test/cluster). A server on a Rocky Linux 10 droplet with SELinux enforcing and an agent on Ubuntu 24.04 were also checked by hand. So was `raspberry_pi`, on a Debian 13 droplet with a stand-in `cmdline.txt`, which checks the edit and the reboot but not a Pi's kernel.
+Rocky Linux 10, Fedora 45, Ubuntu 24.04 and Debian 13. CI applies [examples/local](examples/local) to each on amd64, checks that the second plan has no changes and that the node is Ready, and builds a cluster of three servers and an agent from [test/cluster](test/cluster). Three etcd members in containers on one shared runner are slow to agree, so that job skips etcd's fsync and still fails now and then. A server on a Rocky Linux 10 droplet with SELinux enforcing and an agent on Ubuntu 24.04 were also checked by hand. So was `raspberry_pi`, on a Debian 13 droplet with a stand-in `cmdline.txt`, which checks the edit and the reboot but not a Pi's kernel.
+
+The high-availability layout was also run on four Ubuntu 24.04 droplets, three servers and an agent on a private network, with etcd's fsync on. The cluster came up with all four nodes Ready and three healthy etcd members, and the second plan had no changes. Changing `server_config` restarted the servers one at a time, and the API on the first server answered throughout the other two restarts. Upgrading k3s from v1.37.0 to v1.37.1 did the same, servers one at a time and then the agent, and at every moment at least one server's API answered. Rebooting the first server moved etcd's leader to another, the API kept answering there, and the plan stayed clean.
 
 ## License
 
