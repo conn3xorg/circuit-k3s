@@ -155,7 +155,7 @@ Requires Conn3x v0.6.4 or later, systemd on each host, and outbound HTTPS to git
 
 ## Tested on
 
-Rocky Linux 10, Fedora 45, Ubuntu 24.04 and Debian 13. CI applies [examples/local](examples/local) to each on amd64, checks that the second plan has no changes and that the node is Ready, and builds a cluster of two servers and an agent from [test/cluster](test/cluster). A server on a Rocky Linux 10 droplet with SELinux enforcing and an agent on Ubuntu 24.04 were also checked by hand. So was `raspberry_pi`, on a Debian 13 droplet with a stand-in `cmdline.txt`, which checks the edit and the reboot but not a Pi's kernel.
+Rocky Linux 10, Fedora 45, Ubuntu 24.04 and Debian 13. CI applies [examples/local](examples/local) to each on amd64, checks that the second plan has no changes and that the node is Ready, and builds a cluster of three servers and an agent from [test/cluster](test/cluster). A server on a Rocky Linux 10 droplet with SELinux enforcing and an agent on Ubuntu 24.04 were also checked by hand. So was `raspberry_pi`, on a Debian 13 droplet with a stand-in `cmdline.txt`, which checks the edit and the reboot but not a Pi's kernel.
 
 ## License
 

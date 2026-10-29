@@ -88,7 +88,7 @@ jobs:
   cluster:
     needs: validate
     runs-on: ubuntu-24.04
-    name: cluster (2 servers, 1 agent)
+    name: cluster (3 servers, 1 agent)
     env:
       PODMAN: sudo podman
     steps:
@@ -106,11 +106,11 @@ jobs:
         env: *gh
         run: *install
       - run: sudo modprobe -a br_netfilter overlay
-      - name: Start three Ubuntu 24.04 hosts
+      - name: Start four Ubuntu 24.04 hosts
         env:
           CONTAINERFILE: ${{ github.workspace }}/conn3x/test/images/ubuntu2404/Containerfile
         run: |
-          for n in 1 2 3; do
+          for n in 1 2 3 4; do
             NAME=k3s-n$n PORT=222$n examples/local/up.sh
             cat examples/local/known_hosts >> test/cluster/known_hosts
           done
@@ -122,11 +122,11 @@ jobs:
           conn3x init
           conn3x apply -auto-approve
           conn3x plan -detailed-exitcode
-      - name: Check all three nodes are Ready
+      - name: Check all four nodes are Ready
         run: sudo podman exec k3s-n1 k3s kubectl wait --for=condition=Ready node --all --timeout=2m
       - name: Show the k3s logs
         if: failure()
-        run: for n in 1 2 3; do sudo podman exec k3s-n$n journalctl -u 'k3s*' --no-pager -n 100 || true; done
+        run: for n in 1 2 3 4; do sudo podman exec k3s-n$n journalctl -u 'k3s*' --no-pager -n 100 || true; done
       - name: Clean up
         if: always()
-        run: for n in 1 2 3; do NAME=k3s-n$n examples/local/down.sh; done
+        run: for n in 1 2 3 4; do NAME=k3s-n$n examples/local/down.sh; done
