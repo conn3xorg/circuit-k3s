@@ -151,7 +151,7 @@ Set `k3s_version` and `checksums` together. Take the checksums for `k3s` and `k3
 
 ## Requirements
 
-Requires Conn3x v0.6.4 or later, systemd on each host, and outbound HTTPS to github.com. k3s itself needs 2 GB of memory on a server and 512 MB on an agent.
+Requires Conn3x v0.6.9 or later, systemd on each host, and outbound HTTPS to github.com. k3s itself needs 2 GB of memory on a server and 512 MB on an agent.
 
 ## Tested on
 
