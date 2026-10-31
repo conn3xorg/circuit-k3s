@@ -110,10 +110,10 @@ The first server by name runs first. On it, in order:
 5. Writes the token to `/etc/rancher/k3s/token`, mode `0600`.
 6. Writes `/etc/rancher/k3s/config.yaml`: the token file, every server's address as a `tls-san`, `cluster-init` when there's more than one server, and `server_config`.
 7. Writes `/etc/systemd/system/k3s.service`, the unit k3s's install script writes, with a five-minute start timeout so a node that can't start fails the apply instead of hanging it.
-8. Starts k3s now and at boot.
-9. Waits for the Kubernetes API to listen on port 6443.
+8. Enables k3s at boot and starts it, once, with the settings above already in place.
+9. Waits for the Kubernetes API to listen on port 6443 and for k3s's CRDs to be Established. If they aren't, the apply fails rather than leave a cluster that crash-loops. See [Troubleshooting](#troubleshooting).
 
-Once the API is up, the other servers do the same with `server` set to `server_url`, and the agents do the same with `k3s-agent.service` and the agent settings. A change to the binary, the token, the settings or the unit restarts k3s. Servers restart one at a time, each waiting until the last is back, so a cluster of three never has two etcd members down at once.
+Once that's done, the other servers do the same with `server` set to `server_url`, and the agents do the same with `k3s-agent.service` and the agent settings. A change to the binary, the token, the settings or the unit restarts k3s. Servers restart one at a time, each waiting until the last is back, so a cluster of three never has two etcd members down at once.
 
 Before the circuit runs, the `conn3x_host` data source reads each host's architecture over SSH. `x86_64` and `aarch64` are supported; others fail the plan.
 
@@ -122,6 +122,19 @@ The circuit doesn't open firewall ports. Between nodes, k3s needs TCP 6443 to th
 ### Upgrading
 
 Set `k3s_version` and `checksums` together. Take the checksums for `k3s` and `k3s-arm64` from the release's `sha256sum-amd64.txt` and `sha256sum-arm64.txt`. Conn3x replaces the binary and restarts k3s on each host, the servers one at a time. k3s supports moving up one minor version at a time.
+
+## Troubleshooting
+
+If k3s exits about once a minute with `failed waiting on CRD` and the API comes and goes, one of k3s's CRDs is stuck at `Established=False`, reason `Installing`. k3s was stopped while it was creating that CRD, and Kubernetes won't finish it after a restart. Versions of this circuit before v0.1.4 could cause it on the first start. A CRD in that state can't hold any objects, so it's safe to delete, and k3s creates it again when it starts. This deletes only the ones showing `False`:
+
+```sh
+for c in addons.k3s.cattle.io etcdsnapshotfiles.k3s.cattle.io helmcharts.helm.cattle.io helmchartconfigs.helm.cattle.io; do
+  [ "$(k3s kubectl get crd "$c" -o jsonpath='{.status.conditions[?(@.type=="Established")].status}')" = False ] && k3s kubectl delete crd "$c"
+done
+systemctl restart k3s
+```
+
+Don't delete an Established one. That deletes every object of its kind, such as your HelmCharts.
 
 ## Inputs
 
@@ -155,9 +168,11 @@ Requires Conn3x v0.6.9 or later, systemd on each host, and outbound HTTPS to git
 
 ## Tested on
 
-Rocky Linux 10, Fedora 45, Ubuntu 24.04 and Debian 13. CI applies [examples/local](examples/local) to each on amd64, checks that the second plan has no changes and that the node is Ready, and builds a cluster of three servers and an agent from [test/cluster](test/cluster). Three etcd members in containers on one shared runner are slow to agree, so that job skips etcd's fsync and still fails now and then. A server on a Rocky Linux 10 droplet with SELinux enforcing and an agent on Ubuntu 24.04 were also checked by hand. So was `raspberry_pi`, on a Debian 13 droplet with a stand-in `cmdline.txt`, which checks the edit and the reboot but not a Pi's kernel.
+Rocky Linux 10, Fedora 45, Ubuntu 24.04 and Debian 13. CI applies [examples/local](examples/local) to each on amd64, checks that the second plan has no changes, that the node is Ready, that k3s's CRDs are Established and that Traefik is running, and builds a cluster of three servers and an agent from [test/cluster](test/cluster). Three etcd members in containers on one shared runner are slow to agree, so that job skips etcd's fsync and still fails now and then. A server on a Rocky Linux 10 droplet with SELinux enforcing and an agent on Ubuntu 24.04 were also checked by hand. So was `raspberry_pi`, on a Debian 13 droplet with a stand-in `cmdline.txt`, which checks the edit and the reboot but not a Pi's kernel.
 
 The high-availability layout was also run on four Ubuntu 24.04 droplets, three servers and an agent on a private network, with etcd's fsync on. The cluster came up with all four nodes Ready and three healthy etcd members, and the second plan had no changes. Changing `server_config` restarted the servers one at a time, and the API on the first server answered throughout the other two restarts. Upgrading k3s from v1.37.0 to v1.37.1 did the same, servers one at a time and then the agent, and at every moment at least one server's API answered. Rebooting the first server moved etcd's leader to another, the API kept answering there, and the plan stayed clean.
+
+The first start was run 26 times on fresh droplets, 14 on Ubuntu 24.04 and 12 on Rocky Linux 10, plus four clusters of three servers and an agent, three on Ubuntu 24.04 and one on Rocky Linux 10. Every run started k3s once on the first server, and every CRD was Established with Traefik running. Upgrading a running cluster from v0.1.3 left k3s running without a restart on both systems.
 
 ## License
 
