@@ -40,6 +40,10 @@ locals {
     tls-san    = [for s in var.servers : try(s.address, s)]
   }, var.server_config)
 
+  # k3s leaves out the Helm CRDs when its Helm controller is off.
+  crds             = concat(["addons.k3s.cattle.io", "etcdsnapshotfiles.k3s.cattle.io"], try(var.server_config["disable-helm-controller"], false) ? [] : ["helmcharts.helm.cattle.io", "helmchartconfigs.helm.cattle.io"])
+  crds_established = "/usr/local/bin/k3s kubectl wait --for=condition=Established ${join(" ", [for c in local.crds : "crd/${c}"])} --timeout=5s >/dev/null 2>&1"
+
   # Taken from the unit k3s's install script writes, with a start timeout
   # so a node that can't join fails the apply instead of hanging it.
   unit = <<-EOT
@@ -152,17 +156,13 @@ circuit "k3s_first" {
     notify = [handler.restart]
   }
 
-  step "running" {
+  # Enabled, not started: on a new host the handler below is the first start.
+  # Starting here too would have it restart k3s while k3s creates its CRDs,
+  # and a CRD interrupted there stays Established=False for good.
+  step "enabled" {
     service {
       name    = "k3s"
-      state   = "started"
       enabled = true
-    }
-  }
-
-  step "api" {
-    wait_for {
-      port = 6443
     }
   }
 
@@ -171,6 +171,42 @@ circuit "k3s_first" {
     service {
       name   = "k3s"
       serial = true
+    }
+  }
+}
+
+# Handlers run after a circuit's steps, so what comes after the first start
+# needs a circuit of its own.
+circuit "k3s_first_up" {
+  hosts = { (local.first) = var.servers[local.first] }
+
+  ssh {
+    user             = var.ssh_user
+    port             = var.ssh_port
+    private_key_file = var.ssh_private_key_file
+    known_hosts_file = var.ssh_known_hosts_file
+    become           = var.ssh_become
+  }
+
+  step "running" {
+    service {
+      name  = "k3s"
+      state = "started"
+    }
+    depends_on = [conn3x_service_action.k3s_first__restart]
+  }
+
+  step "api" {
+    wait_for {
+      port = 6443
+    }
+  }
+
+  # The apply fails here rather than leave a cluster that crash-loops.
+  step "crds" {
+    command {
+      command = "for _ in $(seq 36); do ${local.crds_established} && exit 0; sleep 5; done; echo 'k3s CRDs did not become Established. See Troubleshooting in the circuit-k3s README.' >&2; exit 1"
+      unless  = local.crds_established
     }
   }
 }
@@ -190,7 +226,7 @@ circuit "k3s_servers" {
     package {
       name = "curl"
     }
-    depends_on = [conn3x_wait_for.k3s_first__api, conn3x_service_action.k3s_first__restart]
+    depends_on = [conn3x_command.k3s_first_up__crds]
   }
 
   step "br_netfilter" {
@@ -291,7 +327,7 @@ circuit "k3s_agents" {
     package {
       name = "curl"
     }
-    depends_on = [conn3x_wait_for.k3s_first__api, conn3x_service_action.k3s_servers__restart]
+    depends_on = [conn3x_command.k3s_first_up__crds, conn3x_service_action.k3s_servers__restart]
   }
 
   step "br_netfilter" {

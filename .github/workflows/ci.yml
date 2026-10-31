@@ -78,6 +78,8 @@ jobs:
           conn3x apply -auto-approve
           conn3x plan -detailed-exitcode
           sudo podman exec circuit-k3s k3s kubectl wait --for=condition=Ready node --all --timeout=2m
+      - name: Check the CRDs are established and Traefik is running
+        run: sudo podman exec -i circuit-k3s sh -s < test/settled.sh
       - name: Clean up
         if: always()
         working-directory: examples/local
@@ -124,6 +126,8 @@ jobs:
           conn3x plan -detailed-exitcode
       - name: Check all four nodes are Ready
         run: sudo podman exec k3s-n1 k3s kubectl wait --for=condition=Ready node --all --timeout=2m
+      - name: Check the CRDs are established and Traefik is running
+        run: sudo podman exec -i k3s-n1 sh -s < test/settled.sh
       - name: Show the k3s logs
         if: failure()
         run: for n in 1 2 3 4; do sudo podman exec k3s-n$n journalctl -u 'k3s*' --no-pager -n 100 || true; done
