@@ -124,7 +124,7 @@ jobs:
           CONTAINERFILE: ${{ github.workspace }}/conn3x/test/images/ubuntu2404/Containerfile
         run: |
           for n in 1 2 3 4; do
-            NAME=k3s-n$n PORT=222$n examples/local/up.sh
+            CONTAINER_NAME=k3s-n$n PORT=222$n examples/local/up.sh
             cat examples/local/known_hosts >> test/cluster/known_hosts
           done
           cp examples/local/id_ed25519 test/cluster/
@@ -144,4 +144,4 @@ jobs:
         run: for n in 1 2 3 4; do sudo podman exec k3s-n$n journalctl -u 'k3s*' --no-pager -n 100 || true; done
       - name: Clean up
         if: always()
-        run: for n in 1 2 3 4; do NAME=k3s-n$n examples/local/down.sh; done
+        run: for n in 1 2 3 4; do CONTAINER_NAME=k3s-n$n examples/local/down.sh; done

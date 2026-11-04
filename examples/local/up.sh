@@ -12,7 +12,7 @@ set -eu
 cd "$(dirname "$0")"
 port=${PORT:-2222}
 containerfile=${CONTAINERFILE:-Containerfile}
-name=${NAME:-circuit-k3s}
+name=${CONTAINER_NAME:-circuit-k3s}
 
 podman=${PODMAN:-podman}
 [ -f id_ed25519 ] || ssh-keygen -q -t ed25519 -N '' -C "$name" -f id_ed25519
