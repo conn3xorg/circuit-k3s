@@ -91,6 +91,24 @@ jobs:
           fi
       - name: Check the CRDs are established and Traefik is running
         run: sudo podman exec -i circuit-k3s sh -s < test/settled.sh
+      # Restarting the container boots systemd again, so this checks k3s is
+      # enabled, the node comes back Ready with its add-ons, and the plan has
+      # nothing to do.
+      - name: Restart the host, then check the node and the plan again
+        working-directory: examples/local
+        run: |
+          sudo podman restart circuit-k3s
+          for _ in $(seq 60); do
+            case $(sudo podman exec circuit-k3s systemctl is-system-running 2>/dev/null) in running|degraded) break ;; esac
+            sleep 1
+          done
+          for _ in $(seq 60); do
+            sudo podman exec circuit-k3s k3s kubectl get --raw /readyz >/dev/null 2>&1 && break
+            sleep 2
+          done
+          sudo podman exec circuit-k3s k3s kubectl wait --for=condition=Ready node --all --timeout=2m
+          sudo podman exec -i circuit-k3s sh -s < ../../test/settled.sh
+          conn3x plan -detailed-exitcode
       - name: Clean up
         if: always()
         working-directory: examples/local
