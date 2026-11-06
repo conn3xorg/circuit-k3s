@@ -102,13 +102,19 @@ jobs:
             case $(sudo podman exec circuit-k3s systemctl is-system-running 2>/dev/null) in running|degraded) break ;; esac
             sleep 1
           done
+          # k3s can answer once and then restart while it settles after a
+          # boot, so this waits for the node to be Ready, retrying the API.
           for _ in $(seq 60); do
-            sudo podman exec circuit-k3s k3s kubectl get --raw /readyz >/dev/null 2>&1 && break
-            sleep 2
+            sudo podman exec circuit-k3s k3s kubectl wait --for=condition=Ready node --all --timeout=10s >/dev/null 2>&1 && break
+            sleep 5
           done
+          sudo podman exec circuit-k3s k3s kubectl get --raw /readyz
           sudo podman exec circuit-k3s k3s kubectl wait --for=condition=Ready node --all --timeout=2m
           sudo podman exec -i circuit-k3s sh -s < ../../test/settled.sh
           conn3x plan -detailed-exitcode
+      - name: Show the k3s logs
+        if: failure()
+        run: sudo podman exec circuit-k3s journalctl -u k3s --no-pager -n 100 || true
       - name: Clean up
         if: always()
         working-directory: examples/local
