@@ -7,7 +7,10 @@
 # where containerd can use overlayfs. Rootless Podman doesn't hand containers
 # the cpuset cgroup, so on a Podman machine use its root connection:
 # CONTAINER_CONNECTION=podman-machine-default-root ./up.sh. On Linux, set
-# PODMAN="sudo podman".
+# PODMAN="sudo podman". IP gives the container a fixed address on Podman's
+# network, such as 10.88.0.51, so it keeps it across a restart the way a
+# real host keeps its address across a reboot: k3s stops when its node's
+# address changes.
 set -eu
 cd "$(dirname "$0")"
 port=${PORT:-2222}
@@ -19,7 +22,7 @@ podman=${PODMAN:-podman}
 $podman build -q -f "$containerfile" -t "$name" "$(dirname "$containerfile")" >/dev/null
 $podman rm -f -v "$name" >/dev/null 2>&1 || true
 $podman run -d --name "$name" --systemd=always --privileged -v /var/lib/rancher \
-  -p "127.0.0.1:$port:22" "$name" >/dev/null
+  ${IP:+--ip "$IP"} -p "127.0.0.1:$port:22" "$name" >/dev/null
 $podman exec -i "$name" sh -c 'cat > /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys' < id_ed25519.pub
 $podman exec "$name" timeout 60 systemctl is-system-running --wait >/dev/null 2>&1 || true
 
