@@ -70,6 +70,8 @@ jobs:
           CONTAINERFILE: ${{ github.workspace }}/conn3x/test/images/${{ matrix.distro }}/Containerfile
           # Rootless Podman doesn't hand containers the cpuset cgroup k3s needs.
           PODMAN: sudo podman
+          # A fixed address, so the restart below keeps it like a rebooted host.
+          IP: 10.88.0.51
         run: ./up.sh
       - name: Apply, then plan again with no changes
         working-directory: examples/local
